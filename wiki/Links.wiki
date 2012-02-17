@@ -1,1 +1,3 @@
 [http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=36_60&products_id=168 Ultrasonic Sensor]
+[www.freescale.com/files/sensors/doc/app_note/AN3461.pdf Application note for pitch and roll]
+[http://code.google.com/p/ardupilot-mega/ ArduPilot Mega Library]
