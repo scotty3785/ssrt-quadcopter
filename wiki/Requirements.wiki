@@ -1,0 +1,9 @@
+Requirements
+
+# To build a quadcopter
+# Controllable by a user
+# Self Stabilised and Autopilot
+# Use the IMU for stabilisation
+# Use GPS to navigate from point to point
+# Telemetry option back to user.
+# Able to detect its altitude (sonar)
