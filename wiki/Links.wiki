@@ -3,3 +3,14 @@
 [http://www.freescale.com/files/sensors/doc/app_note/AN3461.pdf Application note for pitch and roll]
 
 [http://code.google.com/p/ardupilot-mega/ ArduPilot Mega Library]
+
+
+[http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=55_134&products_id=669 Motors]
+
+[http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=55_134&products_id=716 ESC]
+
+[http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=55_134&products_id=287 ArduPilot]
+
+[http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=55_134&products_id=536 IMU]
+
+[http://www.coolcomponents.co.uk/catalog/product_info.php?cPath=55_134&products_id=910 RC Control]
