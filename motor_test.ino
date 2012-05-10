@@ -34,14 +34,14 @@ APM_RC_APM1 APM_RC;
 #define SWITCH 4
 
 /* Default scale values */
-#define SF 0.01
+#define SF 0.01        //Scale Factor to generate delta value (/100)
 
-int mode 				//used to select mode of operation.
+int mode 				      //used to select mode of operation.
 int pitch_trim = 0;		//the centred value of pitch
-int delta = 0;			//the value used to adjust left/right motors.
-int rc_data[8];			//Stores all 8 channels of RC data
-int motor1;
-int motor2;
+int delta = 0;			   //the value used to adjust left/right motors.
+int rc_data[8];			  //Stores all 8 channels of RC data
+int motor1;            //Value for Left Hand motor
+int motor2;            //Value for Right Hand motor
 
 void setup()
 {
@@ -96,10 +96,12 @@ void loop()
 			{
 				rc_data[i] = APM_RC.InputCh(i);
 			}
-
+      /*Generate the difference between the trim value and our present value
+      Multiply this by a scale factor to reduce the size of it so we don't
+      end up hitting the floor.*/
 			delta = (pitch_trim - rc_data[PITCH]) * SF;
-			motor1 = (rc_data[THROTTLE] + delta);
-			motor2 = (rc_data[THROTTLE] - delta);
+			motor1 = (rc_data[THROTTLE] - delta);
+			motor2 = (rc_data[THROTTLE] + delta);
 			APM_RC.OutputCh(CH1,motor1);
 			APM_RC.OutputCh(CH2,motor2);
 			Serial.printf_P(PSTR("t:%04d p:%04d m1:%04d m2:%04d\n"),(int)rc_data[THROTTLE],(int)rc_data[PITCH],(int)motor1,(int)motor2);
