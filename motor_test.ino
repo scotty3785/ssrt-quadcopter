@@ -36,7 +36,7 @@ APM_RC_APM1 APM_RC;
 /* Default scale values */
 #define SF 0.01        //Scale Factor to generate delta value (/100)
 
-int mode 				      //used to select mode of operation.
+int mode; 				      //used to select mode of operation.
 int pitch_trim = 0;		//the centred value of pitch
 int delta = 0;			   //the value used to adjust left/right motors.
 int rc_data[8];			  //Stores all 8 channels of RC data
