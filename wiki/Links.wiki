@@ -19,3 +19,5 @@
 [http://code.google.com/p/ardupilot-mega/ ArduPilot Mega Library]
 
 [http://gentlenav.googlecode.com/files/DCMDraft2.pdf Direct Cosine Matrix Theory]
+
+[http://code.google.com/p/arducopter/wiki/Quad_Frame_Assembly?ts=1291573355&updated=Quad_Frame_Assembly Very Useful Frame Construction Guide]
