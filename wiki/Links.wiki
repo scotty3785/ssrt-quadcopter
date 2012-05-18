@@ -21,3 +21,5 @@
 [http://gentlenav.googlecode.com/files/DCMDraft2.pdf Direct Cosine Matrix Theory]
 
 [http://code.google.com/p/arducopter/wiki/Quad_Frame_Assembly?ts=1291573355&updated=Quad_Frame_Assembly Very Useful Frame Construction Guide]
+
+[http://diydrones.com/forum/categories/arducopter-1x/listForCategory DIY Drones Discussion Forums]
