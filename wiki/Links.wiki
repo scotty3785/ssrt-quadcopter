@@ -26,3 +26,6 @@
 
 ==Communication Protocol==
 [https://pixhawk.ethz.ch/mavlink/ Mavlink Protcol - Message Types]
+
+==Quadcopter shenanigans==
+[www.youtube.com/watch?v=pp89tTDxXuI Quadcopter Pole Acrobatics]
