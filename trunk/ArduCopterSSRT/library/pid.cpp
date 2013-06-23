@@ -49,10 +49,26 @@ class Pid
 			
 			output = yn1 + (a * xn) + (b * xn1) + (c * xn2);
 			
-			yn1 = output;
-			xn2 = xn1;
-			xn1 = xn;
+			//if(output < 0){
+				//output = 0;
+				//yn1 = 0;
+				//xn1 = 0;
+				//xn2 = 0;
+			//}
+			
+			//else{
+				yn1 = output;
+				xn2 = xn1;
+				xn1 = xn;
+			//}
 			
 			return output;
+		}
+		
+		void reset(void)
+		{
+			yn1 = 0.0F;
+			xn1 = 0.0F;
+			xn2 = 0.0F;
 		}
 };
