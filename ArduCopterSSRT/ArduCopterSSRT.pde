@@ -14,7 +14,10 @@
 #include <AP_Math.h>
 #include <AP_Param.h>
 #include <AP_InertialSensor.h>
+#include <AP_RangeFinder.h>
 #include <AP_ADC.h>
+#include <AP_ADC_AnalogSource.h>
+#include <Filter.h>
 #include <AP_GPS.h>
 #include <AP_AHRS.h>
 #include <AP_Compass.h>
@@ -25,8 +28,8 @@
 #include <Filter.h>
 #include <SITL.h>
 #include <AP_Buffer.h>
-//#include "/home/scott/sketchbook/libraries/mavlink/include/common/mavlink.h"
-#include "library/MotorControl.cpp"
+#include "/home/scott/sketchbook/libraries/mavlink/include/common/mavlink.h"
+#include "/home/scott/ardupilot-mega/ArduCopterSSRT/library/MotorControl.cpp"
 
 #define AP_HAL_BOARD_DRIVER AP_HAL_AVR_APM1
 
@@ -108,20 +111,49 @@ int mode = 0;
 #define YAW 3
 #define SWITCH 5
 
+//#######################Sonar Parameters In  ##########################
+#define SONAR_TYPE AP_RANGEFINDER_MAXSONARLV      // 1 - LV (cheaper)
+// For APM1 we use built in ADC for sonar reads from an analog pin
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 && SONAR_TYPE <= AP_RANGEFINDER_MAXSONARHRLV
+# define USE_ADC_ADS7844  // use APM1's built in ADC and connect sonar to pitot tube
+#endif
+
+// define Pitot tube's ADC Channel
+#define AP_RANGEFINDER_PITOT_TYPE_ADC_CHANNEL 7
+
+// declare global instances
+ModeFilterInt16_Size5 mode_filter(2);
+
+//#ifdef USE_ADC_ADS7844
+//AP_ADC_ADS7844 adc;
+AP_ADC_AnalogSource adc_analog_source(&adc,
+        AP_RANGEFINDER_PITOT_TYPE_ADC_CHANNEL, 0.25);// use Pitot tube
+//#endif
+
+AP_RangeFinder_MaxsonarXL *rf;
+//rf = new AP_RangeFinder_MaxsonarXL(analog_source, &mode_filter);
+
 //######################################################################
 
-float pitchAngleGain[3] = {1,0.25,0.1};
-float pitchRateGain[3] = {1,0,0};
-float rollAngleGain[3] = {1,0.25,0.1};
-float rollRateGain[3] = {1,0,0};
-float yawAngleGain[3] = {1,0,0};
-float yawRateGain[3] = {1,0,0};
+float pitchAngleGain[3] = {0.6,0.1,0.15};
+float pitchRateGain[3] = {0.6,0,0};
+float rollAngleGain[3] = {0.6,0.1,0.15};
+float rollRateGain[3] = {0.6,0,0	};
+float yawAngleGain[3] = {0.25,0,0.025};
+float yawRateGain[3] = {0.25,0,0.025};
+float heightGain[3] = {250, 5, 0};
+float heightVelGain[3] = {1, 0, 0};
 
-	float gains[3][2][3]= {	
+//What works - pitch and roll with p = 0.6, d = 0.1 or 0.05, i = 0.1
+
+	float gains[4][2][3]= {	
 	{{rollAngleGain[0],rollAngleGain[1],rollAngleGain[2]},{rollRateGain[0],rollRateGain[1],rollRateGain[2]}},
 	{{pitchAngleGain[0],pitchAngleGain[1],pitchAngleGain[2]},{pitchRateGain[0],pitchRateGain[1],pitchRateGain[2]}},
-	{{yawAngleGain[0],yawAngleGain[1],yawAngleGain[2]},{yawRateGain[0],yawRateGain[1],yawRateGain[2]}}
+	{{yawAngleGain[0],yawAngleGain[1],yawAngleGain[2]},{yawRateGain[0],yawRateGain[1],yawRateGain[2]}},
+	{{heightGain[0], heightGain[1], heightGain[2]},{heightVelGain[0], heightVelGain[1], heightVelGain[2]}}
 	};
+
+int printdelay = 0;
 
 long roll_trim = 0;
 long pitch_trim = 0;
@@ -155,6 +187,7 @@ void setup(void)
 	
 	//Initialise the UART
 	hal.uartA->begin(115200, 128, 256);
+	hal.uartC->begin(9600, 128, 256);
 
     // Configure the Slide Switch to be an input
     hal.gpio->pinMode(SLIDE_SWITCH_PIN, GPIO_INPUT);
@@ -185,6 +218,16 @@ void setup(void)
 	//Set the unit in to initialise mode
 	mode = WAIT;
 	
+	#ifdef USE_ADC_ADS7844
+    adc.Init();   // APM ADC initialization
+    AP_HAL::AnalogSource *analog_source = &adc_analog_source;
+    float scaling = 3.3;
+	#else     
+    AP_HAL::AnalogSource *analog_source = hal.analogin->channel(3);
+    float scaling = 5;
+	#endif
+    rf = new AP_RangeFinder_MaxsonarXL(analog_source, &mode_filter);
+    rf->calculate_scaler(SONAR_TYPE, scaling);   // setup scaling for sonar
 	
 }
 
@@ -196,11 +239,19 @@ void loop(void)
 	uint16_t rcout[4];
 	float gyro[3];
 	float accel[3];
+	float heightr = 0;
     uint32_t now = hal.scheduler->micros();
     float heading = 0;
 	uint32_t init_time = 0;
 
-
+	multiread(hal.rcin, channels);
+	if (channels[SWITCH]<1500)
+	{
+		mode = WAIT;
+		
+		motor.reset();
+		hal.console->printf("Disabling Motors\n");
+	}
 
 	switch(mode)
 	{
@@ -208,7 +259,8 @@ void loop(void)
 			roll_trim = hal.rcin->read(PITCH);
 			pitch_trim = hal.rcin->read(ROLL);
 			yaw_trim = hal.rcin->read(YAW);
-			if (hal.gpio->read(SLIDE_SWITCH_PIN) == 1)
+			//if (hal.gpio->read(SLIDE_SWITCH_PIN) == 1 && channels[SWITCH]>1500)
+			if (channels[SWITCH]>1500)
 			{
 				mode = INIT;
 				init_time = hal.scheduler->millis() + 5000;
@@ -216,10 +268,20 @@ void loop(void)
 			}
 			else
 			{
+				hal.rcout->write(0,800);
+				hal.rcout->write(1,800);
+				hal.rcout->write(2,800);
+				hal.rcout->write(3,800);
+				
 				hal.rcout->disable_ch(0);
 				hal.rcout->disable_ch(1);
 				hal.rcout->disable_ch(2);
 				hal.rcout->disable_ch(3);
+				hal.uartC->print("dist:");
+				hal.uartC->print(rf->read());
+				hal.uartC->print("\traw:");
+				hal.uartC->print(rf->raw_value);
+				hal.uartC->println();
 			}
 		break;
 		case INIT:
@@ -234,8 +296,8 @@ void loop(void)
 			}
 			else
 			{
-		/*roll_trim and pitch_trim are the values of the the value of the
-		 * controls when the levers are centred*/
+				/*roll_trim and pitch_trim are the values of the the value of the
+				 * controls when the levers are centred*/
 				//roll_trim = hal.rcin->read(PITCH);
 				//pitch_trim = hal.rcin->read(ROLL);
 				//yaw_trim = hal.rcin->read(YAW);
@@ -259,7 +321,7 @@ void loop(void)
 		    ahrs.update();
 		    counter++;
 
-		    if (now - last_print >= 100000 /* 100ms : 10hz */) 
+		    if (now - last_print >= 10000 /* 10ms : 100hz */) 
 			{
 				int16_t trimmedChannels[4];
 				multiread(hal.rcin, channels);
@@ -269,7 +331,6 @@ void loop(void)
 				trimmedChannels[PITCH] = channels[PITCH] - pitch_trim;
 				trimmedChannels[YAW] = channels[YAW] - yaw_trim;
 				
-	
 		        drift  = ahrs.get_gyro();
         		/*hal.console->printf_P(
                 PSTR("r:%4.1f  p:%4.1f y:%4.1f "
@@ -285,28 +346,37 @@ void loop(void)
                 accel[1] = ahrs.pitch;
                 accel[0] = ahrs.roll;
                 accel[2] = ahrs.yaw;
-                gyro[0] = 0;
-                gyro[1] = 0;
-                gyro[2] = 0;
+                gyro[0] = drift.x;
+                gyro[1] = drift.y;
+                gyro[2] = drift.z;
+                
+                float height = (float) rf->read();
+                float heightVal = height * ((float) cos(accel[1])) * ((float) cos(accel[0]));
 
-                motor.calculate(rcout,trimmedChannels,gyro,accel,hal.scheduler->micros(),gains);
+                motor.calculate(rcout,trimmedChannels,gyro,accel,hal.scheduler->micros(),gains,heightVal);
                 //hal.console->printf_P(PSTR("1:%i,2:%i,3:%i,4:%i\n"),channels[0],channels[1],channels[2],channels[3]);
-                hal.console->printf_P(PSTR("roll:%4.1f,pitch:%4.1f,%u,%u,%u,%u\n"),ToDeg(ahrs.roll),ToDeg(ahrs.pitch),rcout[0],rcout[1],rcout[2],rcout[3]);
+                //hal.console->printf_P(PSTR("roll:%4.1f,pitch:%4.1f,%u,%u,%u,%u\n"),ToDeg(ahrs.roll),ToDeg(ahrs.pitch),rcout[0],rcout[1],rcout[2],rcout[3]);
+                //hal.console->printf_P(PSTR("T:%u,(1:%u,2:%u,3:%u,4:%u)\n"),channels[0],rcout[0],rcout[1],rcout[2],rcout[3]);
+                printdelay++;
+                
+                if(printdelay == 30){
+					hal.uartC->printf_P(PSTR("T:%u,TH:%2.1f,(1:%u,2:%u,3:%u,4:%u)\n"),channels[0],height,rcout[0],rcout[1],rcout[2],rcout[3]);
+					printdelay = 0;
+				}
                 hal.rcout->write(0,rcout[0]);
 				hal.rcout->write(1,rcout[1]);
 				hal.rcout->write(2,rcout[2]);
 				hal.rcout->write(3,rcout[3]);
 				
-				
 				last_print = now;
         		counter = 0;
     		}
     		
-    		if (hal.gpio->read(SLIDE_SWITCH_PIN) == 0)
+    		/*if (hal.gpio->read(SLIDE_SWITCH_PIN) == 0)
     		{
 					mode = WAIT;
 					hal.console->printf("Disabling Motors\n");
-			}
+			}*/
 			break;
 
 		}

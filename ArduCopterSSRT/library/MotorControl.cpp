@@ -22,12 +22,15 @@
  */
  
 #include "axis.cpp"
+#include "AP_Math.h"
 
 #define N_TO_U_SCALE_F    250.0F
 
 class MotorControl
 {
 	public:
+	
+	float previousheight = 0;
 
 		MotorControl()
 		{
@@ -54,17 +57,18 @@ class MotorControl
 				float gyros[3],
 				float accels[3],
 				float time,
-				float gains[3][2][3])
+				float gains[4][2][3],
+				float heightVal)
 		{
 			float dt = ((float)(time - lasttime) / 1000000);			
 			lasttime = time;
 			
 			if( firsttime == false )
 			{
-				float throttle = (float) inputs[0];
-				float pitchcmd = (float) inputs[2]/500;
-				float rollcmd = (float) inputs[1]/500;
-				float yawcmd = (float) inputs[3]/500;
+				float throttle = (float) inputs[0]-1000;
+				float pitchcmd = (float) inputs[2]/1000;
+				float rollcmd = (float) inputs[1]/1000;
+				float yawcmd = (float) inputs[3]/1000;
 
 				float pitch_ang = accels[1];
 				float roll_ang = accels[0];
@@ -73,17 +77,20 @@ class MotorControl
 				float pitch_rate = gyros[1];
 				float roll_rate = gyros[0];
 				float yaw_rate = gyros[2];
+				float heightVel = findHeightRate(dt, heightVal);
 
 				float md_pitch = pitchCtrl.calc(pitchcmd, pitch_ang, pitch_rate, dt, gains[1]);
 				float md_roll  = rollCtrl.calc(rollcmd, roll_ang, roll_rate, dt, gains[0]);
 				float md_yaw = yawCtrl.calc(yawcmd, yaw_ang, yaw_rate, dt, gains[2]);
+				//float md_height = heightCtrl.calc(throttle, heightVal, heightVel, dt, gains[3]);
+				float md_height = heightCtrl.calc(100, heightVal, heightVel, dt, gains[3]);
 
-				float motor1diff = - (md_pitch / 2.0) + (md_yaw / 4.0);
+				float motor1diff = (md_pitch / -2.0) + (md_yaw / 4.0);
 				float motor2diff = (md_pitch / 2.0) + (md_yaw / 4.0);
 				float motor3diff =  (md_roll / 2.0)  - (md_yaw / 4.0);
-				float motor4diff = -(md_roll / 2.0)  - (md_yaw / 4.0);
+				float motor4diff = (md_roll / -2.0)  - (md_yaw / 4.0);
 				
-				float throttleMod = 1000 + ((throttle-1000)/1.2);
+				float throttleMod = 1000 + ((md_height));
 				
 				output[0] = (uint16_t) (throttleMod + (motor1diff * N_TO_U_SCALE_F));
 				output[1] = (uint16_t) (throttleMod + (motor2diff * N_TO_U_SCALE_F));
@@ -103,6 +110,20 @@ class MotorControl
 
 			firsttime = false;
 		}
+		
+		void reset(void)
+		{
+			pitchCtrl.reset();
+			rollCtrl.reset();
+			yawCtrl.reset();
+		}
+		
+		float findHeightRate(float time, float height)
+		{
+			float heightRate  = ((height-previousheight)/time);
+			previousheight = height;
+			return heightRate;
+		}
 
 	private:
 
@@ -111,4 +132,5 @@ class MotorControl
 		Axis pitchCtrl;
 		Axis rollCtrl;
 		Axis yawCtrl;
+		Axis heightCtrl;
 };

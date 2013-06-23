@@ -22,6 +22,7 @@
  */
  
  #include "pid.cpp"
+ #include "AP_Math.h"
 
 class Axis
 {
@@ -52,7 +53,23 @@ class Axis
 			
 			motordiff = ratePID.vel_pid( kpr, kir, kdr, dt, rate_error );
 			
-			return motordiff;
+			float isnegative = 1;
+			
+			if(motordiff < 0){
+				isnegative = -1;
+			}
+			
+			float tempmotordiff = motordiff * isnegative;
+			tempmotordiff = safe_sqrt(tempmotordiff);
+			
+			
+			return tempmotordiff*isnegative;
+		}
+		
+		void reset(void)
+		{
+			anglePID.reset();
+			ratePID.reset();
 		}
 	
 	private:
